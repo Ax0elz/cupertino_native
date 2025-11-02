@@ -22,8 +22,10 @@ class CNIcon extends StatefulWidget {
     this.mode,
     this.gradient,
     this.height,
-  }) : assert(symbol != null || imageAsset != null || customIcon != null,
-         'At least one of symbol, imageAsset, or customIcon must be provided');
+  }) : assert(
+         symbol != null || imageAsset != null || customIcon != null,
+         'At least one of symbol, imageAsset, or customIcon must be provided',
+       );
 
   /// The SF Symbol to render.
   /// Priority: [imageAsset] > [customIcon] > [symbol]
@@ -89,12 +91,12 @@ class _CNIconState extends State<CNIcon> {
   @override
   Widget build(BuildContext context) {
     // Priority: imageAsset > customIcon > symbol
-    
+
     // Handle image asset (highest priority)
     if (widget.imageAsset != null) {
       return _buildNativeIcon(context, imageAsset: widget.imageAsset);
     }
-    
+
     // Handle custom icon (medium priority)
     if (widget.customIcon != null) {
       final iconSize = widget.size ?? widget.symbol?.size ?? 24.0;
@@ -113,7 +115,11 @@ class _CNIconState extends State<CNIcon> {
     return _buildNativeIcon(context, customIconBytes: null);
   }
 
-  Widget _buildNativeIcon(BuildContext context, {Uint8List? customIconBytes, CNImageAsset? imageAsset}) {
+  Widget _buildNativeIcon(
+    BuildContext context, {
+    Uint8List? customIconBytes,
+    CNImageAsset? imageAsset,
+  }) {
     const viewType = 'CupertinoNativeIcon';
 
     // Determine which source to use and build parameters accordingly
@@ -163,12 +169,9 @@ class _CNIconState extends State<CNIcon> {
       'isDark': _isDark,
       'style': <String, dynamic>{
         'iconSize': size,
-        if (color != null)
-          'iconColor': resolveColorToArgb(color, context),
-        if (mode != null)
-          'iconRenderingMode': mode.name,
-        if (gradient != null)
-          'iconGradientEnabled': gradient == true,
+        if (color != null) 'iconColor': resolveColorToArgb(color, context),
+        if (mode != null) 'iconRenderingMode': mode.name,
+        if (gradient != null) 'iconGradientEnabled': gradient == true,
         if (paletteColors != null)
           'iconPaletteColors': paletteColors
               .map((c) => resolveColorToArgb(c, context))
@@ -191,8 +194,8 @@ class _CNIconState extends State<CNIcon> {
           );
 
     // Ensure the platform view always has finite constraints
-    final fallbackSize = widget.size ?? 
-        (imageAsset?.size ?? widget.symbol?.size ?? 24.0);
+    final fallbackSize =
+        widget.size ?? (imageAsset?.size ?? widget.symbol?.size ?? 24.0);
     final h = widget.height ?? fallbackSize;
     final w = fallbackSize;
     return SizedBox(width: w, height: h, child: platformView);
@@ -212,7 +215,7 @@ class _CNIconState extends State<CNIcon> {
 
   void _cacheCurrentProps() {
     _lastIsDark = _isDark;
-    
+
     // Determine current source and cache accordingly
     if (widget.imageAsset != null) {
       _lastName = widget.imageAsset!.assetPath;
@@ -265,10 +268,7 @@ class _CNIconState extends State<CNIcon> {
     } else if (widget.symbol != null) {
       name = widget.symbol!.name;
       size = widget.size ?? widget.symbol!.size;
-      color = resolveColorToArgb(
-        widget.color ?? widget.symbol!.color,
-        context,
-      );
+      color = resolveColorToArgb(widget.color ?? widget.symbol!.color, context);
       mode = (widget.mode ?? widget.symbol!.mode)?.name;
       gradient = widget.gradient ?? widget.symbol!.gradient;
     } else {
@@ -281,43 +281,62 @@ class _CNIconState extends State<CNIcon> {
 
     if (_lastName != name) {
       final symbolArgs = <String, dynamic>{'name': name};
-      
+
       // Add imageAsset properties if using imageAsset
       if (widget.imageAsset != null) {
         symbolArgs['assetPath'] = widget.imageAsset!.assetPath;
         symbolArgs['imageData'] = widget.imageAsset!.imageData;
         symbolArgs['imageFormat'] = widget.imageAsset!.imageFormat;
       }
-      
+
       await channel.invokeMethod('setSymbol', symbolArgs);
       _lastName = name;
     }
 
+    // Track if any style properties changed
+    bool hasStyleChanges = false;
     final style = <String, dynamic>{};
+
     if (_lastSize != size) {
       style['iconSize'] = size;
       _lastSize = size;
+      hasStyleChanges = true;
     }
-    if (_lastColor != color && color != null) {
-      style['iconColor'] = color;
+    if (_lastColor != color) {
+      if (color != null) {
+        style['iconColor'] = color;
+      }
       _lastColor = color;
+      hasStyleChanges = true;
     }
-    if (_lastMode != mode && mode != null) {
-      style['iconRenderingMode'] = mode;
+    if (_lastMode != mode) {
+      if (mode != null) {
+        style['iconRenderingMode'] = mode;
+      }
       _lastMode = mode;
+      hasStyleChanges = true;
     }
-    if (_lastGradient != gradient && gradient != null) {
-      style['iconGradientEnabled'] = gradient;
+    if (_lastGradient != gradient) {
+      if (gradient != null) {
+        style['iconGradientEnabled'] = gradient;
+      }
       _lastGradient = gradient;
+      hasStyleChanges = true;
     }
-    
-    // Add imageAsset properties if using imageAsset
-    if (widget.imageAsset != null) {
-      style['assetPath'] = widget.imageAsset!.assetPath;
-      style['imageData'] = widget.imageAsset!.imageData;
-      style['imageFormat'] = widget.imageAsset!.imageFormat;
+
+    // If any style changed, include the icon source to prevent disappearing icons
+    if (hasStyleChanges) {
+      // Add imageAsset properties if using imageAsset
+      if (widget.imageAsset != null) {
+        style['assetPath'] = widget.imageAsset!.assetPath;
+        style['imageData'] = widget.imageAsset!.imageData;
+        style['imageFormat'] = widget.imageAsset!.imageFormat;
+      } else if (widget.symbol != null) {
+        // Include the symbol name so native side knows what to render
+        style['name'] = widget.symbol!.name;
+      }
     }
-    
+
     if (style.isNotEmpty) {
       await channel.invokeMethod('setStyle', style);
     }
